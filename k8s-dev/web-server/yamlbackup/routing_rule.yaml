@@ -1,0 +1,34 @@
+apiVersion: networking.istio.io/v1alpha3
+kind: VirtualService
+metadata:
+  name: web-canary-rules
+  namespace: default
+spec:
+  hosts:
+    - web-service.default.svc.cluster.local
+  http:
+    - route:
+        - destination:
+            host: web-service.default.svc.cluster.local
+            subset: stable
+          weight: 90
+        - destination:
+            host: web-service.default.svc.cluster.local
+            subset: canary
+          weight: 10
+
+---
+apiVersion: networking.istio.io/v1alpha3
+kind: DestinationRule
+metadata:
+  name: web-canary-grouping
+  namespace: default
+spec:
+  host: web-service
+  subsets:
+    - labels:
+        version: stable
+      name: stable
+    - labels:
+        version: canary
+      name: canary

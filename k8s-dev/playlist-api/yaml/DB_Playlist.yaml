@@ -1,0 +1,50 @@
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: playlistdb 
+spec:
+  serviceName: playlistdb-svc
+  replicas: 1
+  selector:
+    matchLabels:
+      db: mariadb
+  template:
+    metadata:
+      labels:
+        db: mariadb
+        app: playlistdb
+    spec:
+      containers:
+        - name: mariadb
+          image: 192.168.40.200:57777/playlist-db/mariadb
+          env:
+            - name: MYSQL_ROOT_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: secret-playlist-db 
+                  key: rootpasswd
+            - name: MYSQL_USER
+              valueFrom:
+                secretKeyRef:
+                  name: secret-playlist-db
+                  key: username
+            - name: MYSQL_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: secret-playlist-db
+                  key: userpasswd
+            - name: MYSQL_DATABASE
+              valueFrom:
+                secretKeyRef:
+                  name: secret-playlist-db
+                  key: databasename
+          ports:
+            - containerPort: 3306
+          volumeMounts:
+            - name: mariadb-pv
+              mountPath: /var/lib/mysql
+      volumes:
+        - name: mariadb-pv
+          persistentVolumeClaim:
+            claimName: pvc-playlist-db
+

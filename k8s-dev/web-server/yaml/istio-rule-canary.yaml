@@ -1,0 +1,52 @@
+apiVersion: networking.istio.io/v1alpha3
+kind: Gateway
+metadata:
+  name: web-gateway
+  namespace: default
+spec:
+  selector:
+    istio: ingressgateway
+  servers:
+  - port:
+      number: 80
+      name: http
+      protocol: HTTP
+    hosts:
+    - "*" 
+---
+apiVersion: networking.istio.io/v1alpha3
+kind: VirtualService
+metadata:
+  name: web-canary-rules
+  namespace: default
+spec:
+  hosts:
+    - "*" 
+  gateways:
+    - web-gateway # 위에서 정의한 Gateway를 참조
+  http:
+    - route:
+        - destination:
+            host: web-service.default.svc.cluster.local
+            subset: stable
+          weight: 90
+        - destination:
+            host: web-service.default.svc.cluster.local
+            subset: canary
+          weight: 10
+---
+apiVersion: networking.istio.io/v1alpha3
+kind: DestinationRule
+metadata:
+  name: web-canary-grouping
+  namespace: default
+spec:
+  host: web-service
+  subsets:
+    - labels:
+        version: stable
+      name: stable
+    - labels:
+        version: canary
+      name: canary
+

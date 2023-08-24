@@ -1,0 +1,80 @@
+pipeline {
+    agent any
+
+	environment {
+        DOCKER_Harbor_path = "192.168.40.200:57777" // Docker Harbor push 경로
+        DOCKER_CREDENTIALS_ID = "Harbor" // Jenkins에 등록된 Harbor 자격 증명 ID
+        IMAGE_NAME = "fastapi" // 이미지 이름 및 태그
+        IMAGE_TAG = "1.2.1"
+        GIT_REPO_URL = "git@192.168.40.200:devteam/" // GitLab 레포지토리 URL
+        REPO_PATH = "playlist-api" // GitLab repo name
+        REMOTE_HOST = "192.168.40.100" // ArgoCD 호스트 IP
+        REMOTE_USER = "user1" // ArgoCD 호스트 SSH 사용자 이름
+    }
+
+    stages {
+        stage('git scm update') {
+            steps {
+                git url: "${GIT_REPO_URL}${REPO_PATH}.git", branch: 'master'
+            }
+        }
+        
+        stage('Docker Build and Push') {
+            steps {
+                script {
+                    def dockerImage = docker.build("${DOCKER_Harbor_path}/${REPO_PATH}/${IMAGE_NAME}:${IMAGE_TAG}", "-f Dockerfile .")
+                    docker.withRegistry("http://${DOCKER_Harbor_path}", DOCKER_CREDENTIALS_ID) {
+                        sh "docker push ${DOCKER_Harbor_path}/${REPO_PATH}/${IMAGE_NAME}:${IMAGE_TAG}" // 이미지를 Docker Harbor에 푸시
+                    }
+                }
+            }
+        }
+        
+        stage('Change Manifest.yaml') {
+            steps { 
+                sh "sed -i 's|image: ${DOCKER_Harbor_path}/${REPO_PATH}/.*|image: ${DOCKER_Harbor_path}/${REPO_PATH}/${IMAGE_NAME}:${IMAGE_TAG}|' yaml/*.yaml"
+            }
+        }
+
+        stage('CD Trigger') {
+            when {
+                expression {
+                    // Check if there are any changes to commit
+                    def changes = sh(script: "git diff --name-only", returnStdout: true).trim()
+                    return changes != ""
+                }
+            }
+            steps {
+                script {
+                    dir("${GIT_REPO_URL}${REPO_PATH}.git") {
+                        withCredentials([sshUserPrivateKey(credentialsId: 'GitLab_ssh_key', keyFileVariable: 'SSH_KEY')]) {
+                            sh """
+                                git config user.email 'jenkins@example.com'
+                                git config user.name 'Jenkins'
+                                git add ~/workspace/k8s-playlist-api-Jenkins/yaml/*.yaml
+                                git commit -m 'Update image in YAML files'
+                                git push origin master
+                            """
+                        }
+                    }
+                }
+            }
+        }
+        stage('Trigger ArgoCD Sync') {
+            when {
+                expression {
+                    currentBuild.resultIsBetterOrEqualTo('SUCCESS')
+                }
+            }
+            steps {
+                script {
+                    withCredentials([usernamePassword(credentialsId: 'Argo', usernameVariable: 'ARGOCD_USERNAME', passwordVariable: 'ARGOCD_PASSWORD')]) {
+                        sh "ssh ${REMOTE_USER}@${REMOTE_HOST} 'argocd login 192.168.10.100:30002 --insecure --username ${ARGOCD_USERNAME} --password ${ARGOCD_PASSWORD}'"
+                        sh "ssh ${REMOTE_USER}@${REMOTE_HOST} 'argocd app sync ${REPO_PATH}'"
+                    }
+                }
+            }
+        }
+    }
+}
+

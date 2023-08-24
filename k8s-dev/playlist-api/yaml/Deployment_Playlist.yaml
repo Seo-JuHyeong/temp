@@ -1,0 +1,32 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: playlistapi
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      api: fastapi
+  template:
+    metadata:
+      labels:
+        api: fastapi
+        app: playlistapi
+    spec:
+      containers:
+        - name: playlistapi
+          image: 192.168.40.200:57777/playlist-api/fastapi:1.2.0
+          ports:
+            - containerPort: 8102
+          env:
+            - name: MYSQL_ROOT_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: secret-playlist-db
+                  key: rootpasswd
+            - name: MYSQL_DATABASE
+              valueFrom:
+                secretKeyRef:
+                  name: secret-playlist-db
+                  key: databasename
+

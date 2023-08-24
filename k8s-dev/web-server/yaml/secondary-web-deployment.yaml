@@ -1,0 +1,21 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: secondary-webserver
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      web: react
+  template:
+    metadata:
+      labels:
+        web: react
+        app: webserver
+        version: canary
+    spec:
+      containers:
+        - name: webserver
+          image: 192.168.40.200:57777/web-server/react:2.0.0
+          ports:
+            - containerPort: 80

@@ -1,0 +1,7 @@
+aiomysql==0.2.0
+databases==0.7.0
+fastapi==0.101.0
+pydantic==1.8.2
+SQLAlchemy==1.4.49
+uvicorn==0.15.0
+pymysql==1.0.2 
